@@ -31,9 +31,14 @@
 #'       \item{\code{point_laplace}}{The family of mixtures where one
 #'         component is a point mass at \eqn{\mu} and the other is a
 #'         double-exponential distribution centered at \eqn{\mu}.}
-#'       \item{\code{generalized_point_laplace}}{The family of asymmetric mixtures 
-#'          where one component is a point mass at \eqn{\mu}, another is an expontial 
-#'          distribution centered at \eqn{\mu}, and the last is another negative exponential dsitribution centered at \eqn{\mu}.}
+#'       \item{\code{gen_point_laplace}}{The family of mixtures where one
+#'         component is a point mass at \eqn{\mu}, one is a nonnegative
+#'         exponential distribution with mode \eqn{\mu}, and the third is a
+#'         nonpositive exponential distribution with mode \eqn{\mu}. Unlike
+#'         the point-Laplace family, the two exponential components may have
+#'         different scale parameters, so that the prior need not be symmetric
+#'         about \eqn{\mu}. Taking equal scale parameters recovers
+#'         \code{point_laplace}.}
 #'       \item{\code{point_exponential}}{The family of mixtures where one
 #'         component is a point mass at \eqn{\mu} and the other is a
 #'         (nonnegative) exponential distribution with mode \eqn{\mu}.}
