@@ -159,6 +159,58 @@ ebnm_point_laplace <- function(x,
                         call = match.call()))
 }
 
+#' Solve the EBNM problem using generalized-point-Laplace priors
+#'
+#' Solves the empirical Bayes normal means (EBNM) problem using the family of
+#'   generalized-point-Laplace priors (the family of mixtures where one component is a point
+#'   mass at \eqn{\mu}, one is an exponential distribution
+#'   with mode \eqn{\mu}, and the last is a negative exponential distribution with mode \eqn{\mu}). 
+#'   Identical to function \code{\link{ebnm}} with argument
+#'   \code{prior_family = "gen_point_laplace"}. For details about the model, see
+#'   \code{\link{ebnm}}.
+#'
+#' @inherit ebnm_point_normal
+#'
+#' @param scale A vector of length two specifying the scale parameters of the
+#'   nonpositive and nonnegative exponential components (in that order), a
+#'   scalar if both components share a single scale parameter, or
+#'   \code{"estimate"} if the scale parameters are to be estimated from the
+#'   data.
+#'
+#' @param g_init The prior distribution \eqn{g}. Usually this is left
+#'   unspecified (\code{NULL}) and estimated from the data. However, it can be
+#'   used in conjuction with \code{fix_g = TRUE} to fix the prior (useful, for
+#'   example, to do computations with the "true" \eqn{g} in simulations). If
+#'   \code{g_init} is specified but \code{fix_g = FALSE}, \code{g_init}
+#'   specifies the initial value of \eqn{g} used during optimization. When
+#'   supplied, \code{g_init} should be an object of class
+#'   \code{\link{genlaplacemix}} or an \code{ebnm} object in which the fitted
+#'   prior is an object of class \code{genlaplacemix}.
+#'
+#' @export
+#'
+ebnm_gen_point_laplace <- function(x,
+                                   s = 1,
+                                   mode = 0,
+                                   scale = "estimate",
+                                   g_init = NULL,
+                                   fix_g = FALSE,
+                                   output = ebnm_output_default(),
+                                   optmethod = NULL,
+                                   control = NULL) {
+  return(ebnm_workhorse(x = x,
+                        s = s,
+                        mode = mode,
+                        scale = scale,
+                        g_init = g_init,
+                        fix_g = fix_g,
+                        output = output,
+                        optmethod = optmethod,
+                        control = control,
+                        prior_family = "gen_point_laplace",
+                        call = match.call()))
+}
+
 #' Solve the EBNM problem using point-exponential priors
 #'
 #' Solves the empirical Bayes normal means (EBNM) problem using the
