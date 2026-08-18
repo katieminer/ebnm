@@ -31,6 +31,9 @@
 #'       \item{\code{point_laplace}}{The family of mixtures where one
 #'         component is a point mass at \eqn{\mu} and the other is a
 #'         double-exponential distribution centered at \eqn{\mu}.}
+#'       \item{\code{generalized_point_laplace}}{The family of asymmetric mixtures 
+#'          where one component is a point mass at \eqn{\mu}, another is an expontial 
+#'          distribution centered at \eqn{\mu}, and the last is another negative exponential dsitribution centered at \eqn{\mu}.}
 #'       \item{\code{point_exponential}}{The family of mixtures where one
 #'         component is a point mass at \eqn{\mu} and the other is a
 #'         (nonnegative) exponential distribution with mode \eqn{\mu}.}
@@ -97,7 +100,8 @@
 #'   family. For normal and point-normal families, it is a scalar
 #'   specifying the standard deviation of the normal component. For
 #'   point-Laplace and point-exponential families, it is a scalar specifying
-#'   the scale parameter of the Laplace or exponential component. For the horseshoe
+#'   the scale parameter of the Laplace or exponential component. For the generalized Laplace, 
+#'   we will require two scales. For the horseshoe
 #'   family, it corresponds to \eqn{s\tau} in the usual parametrization of
 #'   the \code{\link{horseshoe}} distribution. For the family of generalized
 #'   binary priors, it specifies the ratio of the (untruncated) standard
@@ -128,7 +132,7 @@
 #'   an object of class \code{\link[ashr]{normalmix}} for normal, point-normal,
 #'   scale mixture of normals, and \code{deconvolveR} prior families, as well as
 #'   for the NPMLE; class \code{\link{laplacemix}} for
-#'   point-Laplace families; class \code{\link{gammamix}} for point-exponential
+#'   point-Laplace and generalized-point-Laplace families; class \code{\link{gammamix}} for point-exponential
 #'   families; class \code{\link{horseshoe}} for horseshoe families; class
 #'   \code{\link[ashr]{unimix}} for \code{unimodal_} families; or class
 #'   \code{\link[ashr]{tnormalmix}} for generalized binary priors. An object of
@@ -148,7 +152,7 @@
 #'   used.
 #'
 #'   For parametric families other than the horseshoe and generalized binary
-#'   (normal, point-normal, point-Laplace, and point-exponential), options
+#'   (normal, point-normal, point-Laplace, generalized-point-Laplace and point-exponential), options
 #'   include \code{"nlm"} (which calls \code{\link[stats]{nlm}}), \code{"lbfgsb"}
 #'   (which calls \code{\link[stats]{optim}}
 #'   with \code{method = "L-BFGS-B"}), and \code{"trust"} (which
