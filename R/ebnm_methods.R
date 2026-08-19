@@ -261,7 +261,7 @@ summary.ebnm <- function(object, ...) {
     # Identify pointmass.
     if (inherits(g, "normalmix")) {
       pointmass_idx <- which(g$sd == 0)
-    } else if (inherits(g, c("laplacemix", "gammamix"))) {
+    } else if (inherits(g, c("genlaplacemix", "laplacemix", "gammamix"))) {
       pointmass_idx <- which(g$scale == 0)
     } else if (inherits(g, "unimix")) {
       pointmass_idx <- which(g$a == g$b)
@@ -269,7 +269,7 @@ summary.ebnm <- function(object, ...) {
       pointmass_idx <- numeric(0)
     }
     if (length(pointmass_idx) == 1) {
-      if (inherits(g, c("normalmix", "laplacemix"))) {
+      if (inherits(g, c("genlaplacemix", "normalmix", "laplacemix"))) {
         retlist$pointmass_location <- g$mean[pointmass_idx]
       } else if (inherits(g, "gammamix")) {
         retlist$pointmass_location <- g$shift[pointmass_idx]
