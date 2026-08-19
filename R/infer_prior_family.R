@@ -54,5 +54,15 @@ infer_prior_family <- function(g) {
         && g$b[2] == Inf)
       prior_family <- "generalized_binary"
   }
+  } else if (inherits(g, "genlaplacemix")) {
+    if (all(g$mean == g$mean[1])
+        && any(g$sign == -1) #there is a left tail
+        && any(g$sign == 1) #there is a right tail
+        && (length(g$pi) == 2 #no point mass or
+            || (length(g$pi) == 3 && g$sign[1] == 0 && g$scale[1] == 0))) { #two tails and a point mass
+      prior_family <- "gen_point_laplace"
+    }
+  }
+  
   return(prior_family)
 }
