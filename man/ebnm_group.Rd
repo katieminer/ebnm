@@ -61,7 +61,8 @@ each group, a prior of the appropriate class (\code{\link[ashr]{normalmix}}
 for normal, point-normal,
 scale mixture of normals, and \code{deconvolveR} prior families, as well as
 for the NPMLE; class \code{\link{laplacemix}} for
-point-Laplace families; class \code{\link{gammamix}} for point-exponential
+point-Laplace families; class \code{\link{\genlaplacemix}} for generalized point-Laplace families; 
+class \code{\link{gammamix}} for point-exponential
 families; class \code{\link{horseshoe}} for horseshoe families; and class
 \code{\link[ashr]{unimix}} for \code{unimodal_} families).}
 

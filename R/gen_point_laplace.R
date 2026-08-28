@@ -26,18 +26,6 @@ genlaplacemix <- function(pi, mean, scale_pos, scale_neg) {
 #'
 #' @export
 #'
-#'
-genlaplacemix <- function(pi, mean, scale_pos, scale_neg) {
-  structure(data.frame(pi, mean, scale_pos, scale_neg), class="genlaplacemix")
-}
-
-#' @importFrom stats pexp
-#' @importFrom ashr comp_cdf
-#'
-#' @method comp_cdf genlaplacemix
-#'
-#' @export
-#'
 comp_cdf.genlaplacemix = function (m, y, lower.tail = TRUE) {
   
   # Internal function to evaluate the CDF of the generalized components
@@ -83,106 +71,198 @@ comp_cdf.genlaplacemix = function (m, y, lower.tail = TRUE) {
 }
 
 # The gen-point-Laplace family uses the above ebnm class genlaplacemix.
-#
+# We cannot use check_g_init, as the number of parameters is not 3, so we duplicate the function here
+
 genpl_checkg <- function(g_init, fix_g, mode, scale, pointmass, call) {
-  check_g_init(g_init = g_init,
-               fix_g = fix_g,
-               mode = mode,
-               scale = scale,
-               pointmass = pointmass,
-               call = call,
-               class_name = "genlaplacemix",
-               scale_name = c("rate_pos", "rate_neg"))
-}
-
-#' @param x A vector of observations.
-#' @param s A vector of standard errors.
-#' @param g_init An optional initial genlaplacemix object.
-#' @param fix_g Boolean indicating if the prior is completely fixed.
-#' @param pointmass Boolean indicating if a point mass at zero is allowed.
-#' @param scale_pos The scale for the positive tail ("estimate" or numeric).
-#' @param scale_neg The scale for the negative tail ("estimate" or numeric).
-#'
-#' @return A numeric vector of unconstrained parameters for the optimizer.
-
-genpl_initpar <- function(x, s, g_init, fix_g, pointmass, scale_pos, scale_neg) {
-  par <- list()
+  if (is.null(g_init)) {
+    return(invisible(NULL))
+  }
   
-  # SCENARIO A: The user provided an initial prior (g_init) and it has exactly 3 components
-  if (!is.null(g_init) && length(g_init$pi) == 3) {
-    # Extract raw weights and regularize
-    # Add a tiny epsilon to ensure no weight is exactly 0, preventing log(0)
-    eps <- 1e-8
-    pi_vec <- c(g_init$pi[1], g_init$pi[2], g_init$pi[3]) + eps
-    pi_vec <- pi_vec / sum(pi_vec) # Re-normalize so they sum exactly to 1
-    
-    pi_0    <- pi_vec[1]
-    pi_plus <- pi_vec[2]
-    pi_neg  <- pi_vec[3]
-    
-    # Map weights to be unconstrained (anchored to the spike pi_0)
-    par$logit_w_pos <- log(pi_plus / pi_0)
-    par$logit_w_neg <- log(pi_neg / pi_0)
-    
-    # Rates: Convert finite rates to unconstrained log-rates
-    # In genlaplacemix, Component 2 is the positive slab, Component 3 is the negative slab
-    par$log_rate_pos <- log(g_init$rate_pos[2])
-    par$log_rate_neg <- log(g_init$rate_neg[3])
-    
-    par$mu <- g_init$mean[1]
-    
-  } else {
-    # SCENARIO B: Heuristic Empirical Initialization
-    
-    # Handle Weights (Pointmass check)
-    if (!pointmass) {
-      # No point mass means we split the weight 50/50 between the positive and negative slabs. 
-      # We use a tiny epsilon for pi_0 to prevent log(0) = Inf
-      pi_0    <- 1e-8 
-      pi_plus <- 0.50
-      pi_neg  <- 0.50
-      
-    } else {
-      # Default: 50% spike, split the rest, same as point laplace
-      pi_0    <- 0.50
-      pi_plus <- 0.25
-      pi_neg  <- 0.25
-    } 
-    
-    par$logit_w_pos <- log(pi_plus / pi_0)
-    par$logit_w_neg <- log(pi_neg / pi_0)
-    
-    # Rates initialization
-    # Estimate empirical rate by moment matching
-    excess_var <- max(var(x, na.rm = TRUE) - mean(s^2, na.rm = TRUE), 1e-4) 
-    empirical_rate <- 1 / sqrt(excess_var)
-    
-    if (!identical(scale_pos, "estimate")) {
-      if (length(scale_pos) != 1) stop("Argument 'scale_pos' must be a scalar.")
-      par$log_rate_pos <- -log(scale_pos)
-    } else {
-      par$log_rate_pos <- log(empirical_rate)
+  if (!inherits(g_init, "genlaplacemix")) {
+    stop("g_init must be NULL or an object of class genlaplacemix.")
+  }
+  
+  # Components are (point mass, positive slab, negative slab); the point mass
+  #   is omitted when its weight is zero.
+  ncomp <- length(g_init$pi)
+  if (!(ncomp == 2 || (pointmass && ncomp == 3))) {
+    stop("g_init does not have the correct number of components.")
+  }
+  if (ncomp == 3 && !(g_init$scale_pos[1] == 0 && g_init$scale_neg[1] == 0)) {
+    stop("The first component of g_init must be a point mass.")
+  }
+  
+  if (fix_g && (!is.null(call$mode) || !is.null(call$scale))) {
+    warning("mode and scale parameters are ignored when g is fixed.")
+  }
+  
+  if (!fix_g) {
+    if (!is.null(call$mode)
+        && !identical(mode, "estimate")
+        && !isTRUE(all.equal(g_init$mean, rep(mode, length(g_init$mean))))) {
+      stop("If mode is fixed and g_init is supplied, they must agree.")
     }
-    
-    # Check Negative Tail
-    if (!identical(scale_neg, "estimate")) {
-      if (length(scale_neg) != 1) stop("Argument 'scale_neg' must be a scalar.")
-      par$log_rate_neg <- -log(scale_neg)
-    } else {
-      par$log_rate_neg <- log(empirical_rate)
-    }
-    # Mode
-    if (!identical(mode, "estimate")) {
-      par$mu <- mode
-    } else {
-      par$mu <- mean(x) # Center of the data for a two-sided distribution
+    if (!is.null(call$scale) && !identical(scale, "estimate")) {
+      g_scale <- c(g_init$scale_pos[ncomp - 1], g_init$scale_neg[ncomp])
+      if (!isTRUE(all.equal(g_scale, rep(scale, length.out = 2)))) {
+        stop("If scale is fixed and g_init is supplied, they must agree.")
+      }
     }
   }
   
-  # Return as a flat numeric vector for L-BFGS-B
-  return(unlist(par))
+  return(invisible(NULL))
 }
 
+#  Parameters are logit_w_pos and logit_w_neg (softmax weights, with the point
+#   mass as reference category), log_rate_pos, log_rate_neg, and mu. Note that
+#   rates are reciprocals of scales: log_rate = -log(scale).
+#
+#' @importFrom stats var
+#'
+genpl_initpar <- function(g_init, mode, scale, pointmass, x, s) {
+  par <- list()
+  eps <- 1e-8
+  
+  if (!is.null(g_init)) {
+    # Components are ordered (point mass, positive slab, negative slab); the
+    #   point mass is omitted when its weight is zero.
+    if (length(g_init$pi) == 3) {
+      pi_vec <- g_init$pi
+      if (any(pi_vec <= 0)) {
+        pi_vec[pi_vec <= 0] <- eps
+        pi_vec <- pi_vec / sum(pi_vec)
+      }
+      scale_pos <- g_init$scale_pos[2]
+      scale_neg <- g_init$scale_neg[3]
+    } else {
+      pi_vec    <- c(eps, g_init$pi) / sum(c(eps, g_init$pi))
+      scale_pos <- g_init$scale_pos[1]
+      scale_neg <- g_init$scale_neg[2]
+    }
+    
+    par$logit_w_pos  <- log(pi_vec[2] / pi_vec[1])
+    par$logit_w_neg  <- log(pi_vec[3] / pi_vec[1])
+    par$log_rate_pos <- -log(scale_pos)
+    par$log_rate_neg <- -log(scale_neg)
+    par$mu           <- g_init$mean[1]
+    
+    return(par)
+  }
+  # No g_init: initialize from mode, scale, and the data.
+  if (pointmass) {
+    pi_0 <- 0.50; pi_plus <- 0.25; pi_neg <- 0.25
+  } else {
+    pi_0 <- eps;  pi_plus <- 0.50; pi_neg <- 0.50
+  }
+  par$logit_w_pos <- log(pi_plus / pi_0)
+  par$logit_w_neg <- log(pi_neg / pi_0)
+  
+  if (identical(scale, "estimate")) {
+    # Moment match on the variance in excess of the noise.
+    excess_var <- max(var(x) - mean(s^2), 1e-4)
+    par$log_rate_pos <- log(1 / sqrt(excess_var))
+    par$log_rate_neg <- par$log_rate_pos
+  } else {
+    if (!(length(scale) %in% c(1, 2))) {
+      stop("Argument 'scale' must be 'estimate' or a numeric vector of ",
+           "length one or two (positive scale, negative scale).")
+    }
+    scale <- rep(scale, length.out = 2)
+    par$log_rate_pos <- -log(scale[1])
+    par$log_rate_neg <- -log(scale[2])
+  }
+  
+  if (identical(mode, "estimate")) {
+    par$mu <- mean(x)
+  } else {
+    par$mu <- mode
+  }
+  
+  return(par)
+}
+
+
+
+
+
+# genpl_initpar <- function(x, s, g_init, fix_g, pointmass, scale_pos, scale_neg) {
+#   par <- list()
+#   
+#   # SCENARIO A: The user provided an initial prior (g_init) and it has exactly 3 components
+#   if (!is.null(g_init) && length(g_init$pi) == 3) {
+#     # Extract raw weights and regularize
+#     # Add a tiny epsilon to ensure no weight is exactly 0, preventing log(0)
+#     eps <- 1e-8
+#     pi_vec <- c(g_init$pi[1], g_init$pi[2], g_init$pi[3]) + eps
+#     pi_vec <- pi_vec / sum(pi_vec) # Re-normalize so they sum exactly to 1
+#     
+#     pi_0    <- pi_vec[1]
+#     pi_plus <- pi_vec[2]
+#     pi_neg  <- pi_vec[3]
+#     
+#     # Map weights to be unconstrained (anchored to the spike pi_0)
+#     par$logit_w_pos <- log(pi_plus / pi_0)
+#     par$logit_w_neg <- log(pi_neg / pi_0)
+#     
+#     # Rates: Convert finite rates to unconstrained log-rates
+#     # In genlaplacemix, Component 2 is the positive slab, Component 3 is the negative slab
+#     par$log_rate_pos <- log(g_init$rate_pos[2])
+#     par$log_rate_neg <- log(g_init$rate_neg[3])
+#     
+#     par$mu <- g_init$mean[1]
+#     
+#   } else {
+#     # SCENARIO B: Heuristic Empirical Initialization
+#     
+#     # Handle Weights (Pointmass check)
+#     if (!pointmass) {
+#       # No point mass means we split the weight 50/50 between the positive and negative slabs. 
+#       # We use a tiny epsilon for pi_0 to prevent log(0) = Inf
+#       pi_0    <- 1e-8 
+#       pi_plus <- 0.50
+#       pi_neg  <- 0.50
+#       
+#     } else {
+#       # Default: 50% spike, split the rest, same as point laplace
+#       pi_0    <- 0.50
+#       pi_plus <- 0.25
+#       pi_neg  <- 0.25
+#     } 
+#     
+#     par$logit_w_pos <- log(pi_plus / pi_0)
+#     par$logit_w_neg <- log(pi_neg / pi_0)
+#     
+#     # Rates initialization
+#     # Estimate empirical rate by moment matching
+#     excess_var <- max(var(x, na.rm = TRUE) - mean(s^2, na.rm = TRUE), 1e-4) 
+#     empirical_rate <- 1 / sqrt(excess_var)
+#     
+#     if (!identical(scale_pos, "estimate")) {
+#       if (length(scale_pos) != 1) stop("Argument 'scale_pos' must be a scalar.")
+#       par$log_rate_pos <- -log(scale_pos)
+#     } else {
+#       par$log_rate_pos <- log(empirical_rate)
+#     }
+#     
+#     # Check Negative Tail
+#     if (!identical(scale_neg, "estimate")) {
+#       if (length(scale_neg) != 1) stop("Argument 'scale_neg' must be a scalar.")
+#       par$log_rate_neg <- -log(scale_neg)
+#     } else {
+#       par$log_rate_neg <- log(empirical_rate)
+#     }
+#     # Mode
+#     if (!identical(mode, "estimate")) {
+#       par$mu <- mode
+#     } else {
+#       par$mu <- mean(x) # Center of the data for a two-sided distribution
+#     }
+#   }
+#   
+#   # Return as a flat numeric vector for L-BFGS-B
+#   return(unlist(par))
+# }
+# 
 genpl_scalepar <- function(par, scale_factor) {
   # Adjust the positive log-rate
   if (!is.null(par$log_rate_pos)) {
@@ -192,7 +272,7 @@ genpl_scalepar <- function(par, scale_factor) {
   if (!is.null(par$log_rate_neg)) {
     par$log_rate_neg <- par$log_rate_neg - log(scale_factor)
   }
-  
+
   # Adjust the mode (if you choose to estimate it)
   if (!is.null(par$mu)) {
     par$mu <- scale_factor * par$mu
@@ -223,7 +303,7 @@ genpl_precomp <- function(x, s, par_init, fix_par) {
 #
 #' @importFrom stats pnorm
 #'
-genpl_nllik <- function(par, x, s, par_init, fix_par) {
+genpl_nllik <- function(par, x, s, par_init, fix_par,  calc_grad = FALSE, calc_hess = FALSE) { #done for now
   
   # Unpack and Transform Parameters
   p <- unlist(par_init)
@@ -274,11 +354,11 @@ genpl_nllik <- function(par, x, s, par_init, fix_par) {
 }
 
 
-
-logscale_add <- function(log.x, log.y) {
-  C <- pmax(log.x, log.y)
-  return(log(exp(log.x - C) + exp(log.y - C)) + C)
-  }
+#Added this, but i dont think we need it
+# logscale_add <- function(log.x, log.y) {
+#   C <- pmax(log.x, log.y)
+#   return(log(exp(log.x - C) + exp(log.y - C)) + C)
+#   }
   
 # Postcomputations: check boundary solutions.
 genpl_postcomp <- function(optpar, optval, x, s, par_init, fix_par, scale_factor) {
@@ -288,7 +368,7 @@ genpl_postcomp <- function(optpar, optval, x, s, par_init, fix_par, scale_factor
   # Check the solution pi0 = 1.
   weights_estimated <- !fix_par[1] || !fix_par[2]
   fix_mu  <- fix_par[5]
-  if (!fix_pi0 && fix_mu) {
+  if (!weights_estimated && fix_mu) {
     pi0_llik <- sum(-0.5 * log(2 * pi * s^2) - 0.5 * (x - par_init$mu)^2 / s^2)
     pi0_llik <- pi0_llik + sum(is.finite(x)) * log(scale_factor) #add back scaling factor
     if (pi0_llik > llik) { #The override (why do we need this?)
@@ -338,7 +418,7 @@ genpl_summres_untransformed <- function(x, s, pi_0, pi_plus, pi_neg, rate_pos, r
   x <- x - mu
   
   # Get the Posterior Inclusion Probabilities (PIPs)
-  gammas <- wpost_genpl(x, s, pi_0, pi_plus, pi_neg, rate_pos, rate_neg)
+  gammas <- pipost_genpl(x, s, pi_0, pi_plus, pi_neg, rate_pos, rate_neg)
   gamma_plus <- gammas$pos #post inclusion prob for pos slab
   gamma_neg  <- gammas$neg #post inclusion prob for neg slab
   
@@ -384,13 +464,11 @@ genpl_summres_untransformed <- function(x, s, pi_0, pi_plus, pi_neg, rate_pos, r
   return(post)
 }
 
-#' Calculate posterior weights for Generalized Point-Laplace
-#'
+# Calculate posterior weights for Generalized Point-Laplace
+#
 #' @importFrom stats dnorm pnorm
 #'
-pipost_genpl <- function(x, s, pi_pos, pi_neg, lambda_pos, lambda_neg) {
-  
-  pi_0 <- 1 - pi_pos - pi_neg
+pipost_genpl <- function(x, s, pi_0, pi_pos, pi_neg, lambda_pos, lambda_neg) {
   
   # Boundary Checks
   if (pi_0 == 1) {
@@ -425,7 +503,7 @@ pipost_genpl <- function(x, s, pi_pos, pi_neg, lambda_pos, lambda_neg) {
   pipost_pos <- exp(l_pos - l_tot)
   pipost_neg <- exp(l_neg - l_tot)
   
-  return(list(pos = lambdapost_pos, neg = lambdapost_neg))
+  return(list(pos = pipost_pos, neg = pipost_neg))
 }
 
 #Convert optimization parameters to a genlaplacemix prior object
@@ -461,9 +539,8 @@ genpl_partog <- function(par) {
                        mean = rep(mu, 3),
                        scale_pos = c(0, scale_pos, 0),
                        scale_neg = c(0, 0, scale_neg))
-  
+  }
   return(g)
-}
 }
 
 genpl_postsamp <- function(x, s, optpar, nsamp) {
@@ -497,7 +574,7 @@ genpl_postsamp_untransformed <- function(x, s, pi_0, pi_plus, pi_neg, lambda_pos
   x <- x - mu
   
   # Get the Posterior Inclusion Probabilities (gammas)
-  gammas <- wpost_genpl(x, s, pi_plus, pi_neg, lambda_pos, lambda_neg)
+  gammas <- pipost_genpl(x, s, pi_0, pi_plus, pi_neg, lambda_pos, lambda_neg)
   gamma_plus <- gammas$pos
   gamma_neg  <- gammas$neg
   
@@ -544,4 +621,29 @@ genpl_postsamp_untransformed <- function(x, s, pi_0, pi_plus, pi_neg, lambda_pos
   samp <- samp + mu
   
   return(samp)
+}
+
+
+########### NEW FUNCTION JUST FOR GENERALIZED POINT LAPLACE BECAUSE WE HAVE 5 PARAMS 
+# Translate the ebnm interface (pointmass/scale/mode) into the generalized
+#   optimization interface. The other parametric families have three
+#   parameters, so parametric_workhorse builds fix_par itself; the generalized
+#   point-Laplace family has five:
+#
+#     c(logit_w_pos, logit_w_neg, log_rate_pos, log_rate_neg, mu)
+#
+#   The weights are parameterized as a softmax with the point mass as the
+#   reference category, so slots 1 and 2 are both weight parameters and slots
+#   3 and 4 are both scale parameters.
+#
+
+genpl_fixpar <- function(pointmass, scale, mode) {
+  # The two scale parameters are estimated together or not at all.
+  fix_scale <- !identical(scale, "estimate")
+  
+  return(c(!pointmass,                      # logit_w_pos
+           !pointmass,                      # logit_w_neg
+           fix_scale,                       # log_rate_pos
+           fix_scale,                       # log_rate_neg
+           !identical(mode, "estimate")))   # mu
 }

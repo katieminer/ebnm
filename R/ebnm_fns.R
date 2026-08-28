@@ -172,7 +172,7 @@ ebnm_point_laplace <- function(x,
 #' @inherit ebnm_point_normal
 #'
 #' @param scale A vector of length two specifying the scale parameters of the
-#'   nonpositive and nonnegative exponential components (in that order), a
+#'   nonnegative and nonpositive exponential components (in that order), a
 #'   scalar if both components share a single scale parameter, or
 #'   \code{"estimate"} if the scale parameters are to be estimated from the
 #'   data.

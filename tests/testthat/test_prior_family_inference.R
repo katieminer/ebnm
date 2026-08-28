@@ -13,6 +13,7 @@ test_family <- function(family) {
 test_that("all families are inferred correctly", {
   test_family("point_normal")
   test_family("point_laplace")
+  test_family("gen_point_laplace")
   test_family("point_exponential")
   test_family("normal")
   test_family("normal_scale_mixture")

@@ -137,8 +137,9 @@
 #'   an object of class \code{\link[ashr]{normalmix}} for normal, point-normal,
 #'   scale mixture of normals, and \code{deconvolveR} prior families, as well as
 #'   for the NPMLE; class \code{\link{laplacemix}} for
-#'   point-Laplace and generalized-point-Laplace families; class \code{\link{gammamix}} for point-exponential
-#'   families; class \code{\link{horseshoe}} for horseshoe families; class
+#'   point-Laplace; \code{\link{genlaplacemix}} for generalized-point-Laplace families; 
+#'   class \code{\link{gammamix}} for point-exponentialfamilies; 
+#'   class \code{\link{horseshoe}} for horseshoe families; class
 #'   \code{\link[ashr]{unimix}} for \code{unimodal_} families; or class
 #'   \code{\link[ashr]{tnormalmix}} for generalized binary priors. An object of
 #'   class \code{ebnm} can also be supplied as argument, provided that field
@@ -260,7 +261,9 @@
 #'
 #'   Calling into functions \code{\link{ebnm_point_normal}},
 #'   \code{\link{ebnm_point_laplace}},
-#'   \code{\link{ebnm_point_exponential}}, \code{\link{ebnm_normal}},
+#'   \code{\link{ebnm_gen_point_laplace}},
+#'   \code{\link{ebnm_point_exponential}}, 
+#'   \code{\link{ebnm_normal}},
 #'   \code{\link{ebnm_horseshoe}},
 #'   \code{\link{ebnm_normal_scale_mixture}}, \code{\link{ebnm_unimodal}},
 #'   \code{\link{ebnm_unimodal_symmetric}},
@@ -321,6 +324,7 @@ ebnm <- function(x,
                  prior_family = c("point_normal",
                                   "point_laplace",
                                   "point_exponential",
+                                  "gen_point_laplace",
                                   "normal",
                                   "horseshoe",
                                   "normal_scale_mixture",
@@ -500,6 +504,29 @@ ebnm_workhorse <- function(x,
                                     summres_fn = pe_summres,
                                     partog_fn = pe_partog,
                                     postsamp_fn = pe_postsamp,
+                                    call = call,
+                                    ...)
+  } else if (prior_family == "gen_point_laplace") {
+    retlist <- parametric_workhorse(x = x,
+                                    s = s,
+                                    mode = mode,
+                                    scale = scale,
+                                    pointmass = TRUE,
+                                    g_init = g_init,
+                                    fix_g = fix_g,
+                                    output = output,
+                                    optmethod = optmethod,
+                                    control = control,
+                                    checkg_fn = genpl_checkg,
+                                    initpar_fn = genpl_initpar,
+                                    fixpar_fn = genpl_fixpar,
+                                    scalepar_fn = genpl_scalepar,
+                                    precomp_fn = genpl_precomp,
+                                    nllik_fn = genpl_nllik,
+                                    postcomp_fn = genpl_postcomp,
+                                    summres_fn = genpl_summres,
+                                    partog_fn = genpl_partog,
+                                    postsamp_fn = genpl_postsamp,
                                     call = call,
                                     ...)
   } else if (prior_family == "normal") {

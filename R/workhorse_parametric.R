@@ -26,6 +26,7 @@ parametric_workhorse <- function(x,
                                  control,
                                  checkg_fn,
                                  initpar_fn,
+                                 fixpar_fn = NULL, #only need this for generalized point laplace
                                  scalepar_fn,
                                  precomp_fn,
                                  nllik_fn,
@@ -59,7 +60,10 @@ parametric_workhorse <- function(x,
                                        x = x,
                                        s = s))
   if (fix_g) {
-    fix_par <- c(TRUE, TRUE, TRUE)
+    fix_par <- rep(TRUE, length(par_init))
+  } else if (!is.null(fixpar_fn)) {
+    fix_par <- do.call(fixpar_fn, list(pointmass = pointmass, #this is true for 
+                                       scale = scale, mode = mode))
   } else {
     fix_par <- c(!pointmass,
                  !identical(scale, "estimate"),

@@ -9,10 +9,10 @@
 ebnm(
   x,
   s = 1,
-  prior_family = c("point_normal", "point_laplace", "point_exponential", "normal",
-    "horseshoe", "normal_scale_mixture", "unimodal", "unimodal_symmetric",
-    "unimodal_nonnegative", "unimodal_nonpositive", "generalized_binary", "npmle",
-    "deconvolver", "flat", "point_mass", "ash"),
+  prior_family = c("point_normal", "point_laplace", "point_exponential",
+    "gen_point_laplace", "normal", "horseshoe", "normal_scale_mixture", "unimodal",
+    "unimodal_symmetric", "unimodal_nonnegative", "unimodal_nonpositive",
+    "generalized_binary", "npmle", "deconvolver", "flat", "point_mass", "ash"),
   mode = 0,
   scale = "estimate",
   g_init = NULL,
@@ -59,7 +59,8 @@ normal component (the location of the point mass is fixed at zero).}
   family. For normal and point-normal families, it is a scalar
   specifying the standard deviation of the normal component. For
   point-Laplace and point-exponential families, it is a scalar specifying
-  the scale parameter of the Laplace or exponential component. For the horseshoe
+  the scale parameter of the Laplace or exponential component. For the generalized Laplace, 
+  we will require two scales. For the horseshoe
   family, it corresponds to \eqn{s\tau} in the usual parametrization of
   the \code{\link{horseshoe}} distribution. For the family of generalized
   binary priors, it specifies the ratio of the (untruncated) standard
@@ -90,8 +91,9 @@ and \code{scale} parameters. If \code{g_init} is supplied, it should be
 an object of class \code{\link[ashr]{normalmix}} for normal, point-normal,
 scale mixture of normals, and \code{deconvolveR} prior families, as well as
 for the NPMLE; class \code{\link{laplacemix}} for
-point-Laplace families; class \code{\link{gammamix}} for point-exponential
-families; class \code{\link{horseshoe}} for horseshoe families; class
+point-Laplace; \code{\link{genlaplacemix}} for generalized-point-Laplace families; 
+class \code{\link{gammamix}} for point-exponentialfamilies; 
+class \code{\link{horseshoe}} for horseshoe families; class
 \code{\link[ashr]{unimix}} for \code{unimodal_} families; or class
 \code{\link[ashr]{tnormalmix}} for generalized binary priors. An object of
 class \code{ebnm} can also be supplied as argument, provided that field
@@ -110,7 +112,7 @@ below.}
   used.
 
   For parametric families other than the horseshoe and generalized binary
-  (normal, point-normal, point-Laplace, and point-exponential), options
+  (normal, point-normal, point-Laplace, generalized-point-Laplace and point-exponential), options
   include \code{"nlm"} (which calls \code{\link[stats]{nlm}}), \code{"lbfgsb"}
   (which calls \code{\link[stats]{optim}}
   with \code{method = "L-BFGS-B"}), and \code{"trust"} (which
@@ -221,6 +223,14 @@ Given vectors of data \code{x} and standard errors \code{s}, \code{ebnm}
       \item{\code{point_laplace}}{The family of mixtures where one
         component is a point mass at \eqn{\mu} and the other is a
         double-exponential distribution centered at \eqn{\mu}.}
+      \item{\code{gen_point_laplace}}{The family of mixtures where one
+        component is a point mass at \eqn{\mu}, one is a nonnegative
+        exponential distribution with mode \eqn{\mu}, and the third is a
+        nonpositive exponential distribution with mode \eqn{\mu}. Unlike
+        the point-Laplace family, the two exponential components may have
+        different scale parameters, so that the prior need not be symmetric
+        about \eqn{\mu}. Taking equal scale parameters recovers
+        \code{point_laplace}.}
       \item{\code{point_exponential}}{The family of mixtures where one
         component is a point mass at \eqn{\mu} and the other is a
         (nonnegative) exponential distribution with mode \eqn{\mu}.}
@@ -333,7 +343,9 @@ A plotting method is available for \code{ebnm} objects: see
 
   Calling into functions \code{\link{ebnm_point_normal}},
   \code{\link{ebnm_point_laplace}},
-  \code{\link{ebnm_point_exponential}}, \code{\link{ebnm_normal}},
+  \code{\link{ebnm_gen_point_laplace}},
+  \code{\link{ebnm_point_exponential}}, 
+  \code{\link{ebnm_normal}},
   \code{\link{ebnm_horseshoe}},
   \code{\link{ebnm_normal_scale_mixture}}, \code{\link{ebnm_unimodal}},
   \code{\link{ebnm_unimodal_symmetric}},
