@@ -27,6 +27,8 @@ parametric_workhorse <- function(x,
                                  checkg_fn,
                                  initpar_fn,
                                  fixpar_fn = NULL, #only need this for generalized point laplace
+                                 pi_fixed = NULL, #only used by generalized point laplace
+                                 scale_ratio = NULL, #only used by generalized point laplace
                                  scalepar_fn,
                                  precomp_fn,
                                  nllik_fn,
@@ -49,25 +51,46 @@ parametric_workhorse <- function(x,
                           call = call))
 
   # Translate ebnm interface (mode/scale/pointmass/g_init/fix_g) into a
-  #   generalized optimization interface (par_init/fix_par). fix_par, a vector
-  #   of length 3, indicates whether 1. the weight of the spike component;
-  #   2. the scale of the slab component; and 3. the location of the components
-  #   is fixed.
-  par_init <- do.call(initpar_fn, list(g_init = g_init,
-                                       mode = mode,
-                                       scale = scale,
-                                       pointmass = pointmass,
-                                       x = x,
-                                       s = s))
+  #   generalized optimization interface (par_init/fix_par). For most families
+  #   fix_par is a vector of length 3, indicating whether 1. the weight of the
+  #   spike component; 2. the scale of the slab component; and 3. the location
+  #   of the components is fixed.
+  #
+  # The generalized point-Laplace family instead supplies a fixpar_fn that
+  #   returns a list, since its constraints can change both the number of
+  #   parameters and what one of them means. Those extra fields are forwarded
+  #   to initpar_fn and precomp_fn, so fix_par has to be built first here.
+  genpl_extra <- list() #only non-empty for generalized point laplace
+
   if (fix_g) {
-    fix_par <- rep(TRUE, length(par_init))
+    # Everything is fixed, so the constrained parameterizations are moot and
+    # the canonical one is used. fix_par needs par_init's length, so it is
+    # filled in below.
+    fix_par <- NULL
   } else if (!is.null(fixpar_fn)) {
-    fix_par <- do.call(fixpar_fn, list(pointmass = pointmass, #this is true for 
-                                       scale = scale, mode = mode))
+    fixpar_res  <- do.call(fixpar_fn, list(pointmass = pointmass,
+                                           scale = scale, mode = mode,
+                                           pi_fixed = pi_fixed,
+                                           scale_ratio = scale_ratio))
+    fix_par     <- fixpar_res$fix_par
+    genpl_extra <- fixpar_res[c("fixed_comp", "fixed_c",
+                                "ratio_ref", "ratio_k")]
   } else {
     fix_par <- c(!pointmass,
                  !identical(scale, "estimate"),
                  !identical(mode, "estimate"))
+  }
+
+  par_init <- do.call(initpar_fn, c(list(g_init = g_init,
+                                         mode = mode,
+                                         scale = scale,
+                                         pointmass = pointmass,
+                                         x = x,
+                                         s = s),
+                                    genpl_extra))
+
+  if (fix_g) {
+    fix_par <- rep(TRUE, length(par_init))
   }
 
   optmethod <- handle_optmethod_parameter(optmethod, fix_par)
@@ -94,7 +117,8 @@ parametric_workhorse <- function(x,
                            optmethod = optmethod$fn,
                            control = control,
                            use_grad = optmethod$use_grad,
-                           use_hess = optmethod$use_hess)
+                           use_hess = optmethod$use_hess,
+                           precomp_extra = genpl_extra)
 
   # Build return object.
   retlist <- list()
@@ -169,7 +193,8 @@ mle_parametric <- function(x,
                            optmethod,
                            control,
                            use_grad,
-                           use_hess) {
+                           use_hess,
+                           precomp_extra = list()) { #only used by generalized point laplace
   scale_factor <- 1 / median(s[s > 0])
   x <- x * scale_factor
   s <- s * scale_factor
@@ -177,10 +202,15 @@ mle_parametric <- function(x,
   par_init <- do.call(scalepar_fn, list(par = par_init,
                                         scale_factor = scale_factor))
 
-  precomp <- do.call(precomp_fn, list(x = x,
-                                      s = s,
-                                      par_init = par_init,
-                                      fix_par = fix_par))
+  # precomp_extra holds the generalized point-Laplace constraints
+  #   (fixed_comp / fixed_c for a pinned weight, ratio_ref / ratio_k for the
+  #   tail-heaviness bound). precomp_fn returns them again, which is how they
+  #   reach both nllik_fn (via fn_params) and postcomp_fn below.
+  precomp <- do.call(precomp_fn, c(list(x = x,
+                                        s = s,
+                                        par_init = par_init,
+                                        fix_par = fix_par),
+                                   precomp_extra))
 
   # Parameters that end up getting passed to all optimization functions:
   fn_params <- c(list(x = x, s = s, par_init = par_init, fix_par = fix_par),

@@ -427,7 +427,9 @@ ebnm_workhorse <- function(x,
   }
 
   mode <- handle_mode_parameter(mode)
-  scale <- handle_scale_parameter(scale)
+  #only generalized point laplace accepts NA, for a singly-fixed scale
+  scale <- handle_scale_parameter(
+    scale, allow_na = identical(prior_family, "gen_point_laplace"))
 
   if (is.null(control)) {
     control <- list()
@@ -823,12 +825,15 @@ handle_mode_parameter <- function(mode) {
   return(mode)
 }
 
-handle_scale_parameter <- function(scale) {
+handle_scale_parameter <- function(scale, allow_na = FALSE) {
   # Allow partial matching.
   if (identical(pmatch(scale, "estimate"), 1L)) {
     scale <- "estimate"
   }
-  else if (!(is.numeric(scale) && all(is.finite(scale)))) {
+  # When allow_na is set (generalized point-Laplace only), NA is permitted and
+  #   marks a scale that is to be estimated while the other is held fixed.
+  else if (!(is.numeric(scale)
+             && all(is.finite(scale) | (allow_na & is.na(scale))))) {
     stop("Argument 'scale' must be either 'estimate' or numeric.")
   }
   return(scale)

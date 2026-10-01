@@ -175,7 +175,22 @@ ebnm_point_laplace <- function(x,
 #'   nonnegative and nonpositive exponential components (in that order), a
 #'   scalar if both components share a single scale parameter, or
 #'   \code{"estimate"} if the scale parameters are to be estimated from the
-#'   data.
+#'   data. In the length-two form, \code{NA} marks a single scale that is to be
+#'   estimated while the other is held fixed.
+#'
+#' @param pi_fixed A list with elements \code{comp} and \code{value}, pinning
+#'   one mixture weight to a known constant: \code{comp} is one of
+#'   \code{"spike"}, \code{"pos"}, or \code{"neg"}, and \code{value} is a
+#'   number strictly between zero and one. The remaining two weights are
+#'   estimated, sharing the leftover mass. Left as \code{NULL}, all three
+#'   weights are estimated freely.
+#'
+#' @param scale_ratio A positive number bounding how heavy the estimated tail
+#'   may be relative to the fixed one: the estimated scale is at most
+#'   \code{scale_ratio} times the fixed scale. Requires exactly one of the two
+#'   scales to be fixed, which \code{scale} specifies by giving one number and
+#'   one \code{NA}. Note that this constrains the scales, so in terms of the
+#'   rates (their reciprocals) it bounds the estimated rate from below.
 #'
 #' @param g_init The prior distribution \eqn{g}. Usually this is left
 #'   unspecified (\code{NULL}) and estimated from the data. However, it can be
@@ -193,6 +208,8 @@ ebnm_gen_point_laplace <- function(x,
                                    s = 1,
                                    mode = 0,
                                    scale = "estimate",
+                                   pi_fixed = NULL,
+                                   scale_ratio = NULL,
                                    g_init = NULL,
                                    fix_g = FALSE,
                                    output = ebnm_output_default(),
@@ -202,6 +219,8 @@ ebnm_gen_point_laplace <- function(x,
                         s = s,
                         mode = mode,
                         scale = scale,
+                        pi_fixed = pi_fixed,
+                        scale_ratio = scale_ratio,
                         g_init = g_init,
                         fix_g = fix_g,
                         output = output,
