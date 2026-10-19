@@ -481,6 +481,33 @@ test_that("Gradient and Hessian are correct under the tail-heaviness constraint"
   }
 })
 
+test_that("Tail-heaviness derivatives are correct with the mode free", {
+  # The test above fixes mu, so it never exercises the delta-mu cross term.
+  #   Free mu here, for both reference tails, with and without a pinned weight.
+  k <- 2.5
+  for (ref in c("pos", "neg")) {
+    for (comp in c("none", "spike", "pos", "neg")) {
+      if (identical(comp, "none")) {
+        p  <- c(0.4, -0.2, log(0.5), log(0.5), 0.15)
+        fp <- c(FALSE, FALSE, identical(ref, "pos"), identical(ref, "neg"),
+                FALSE)
+        args <- list()
+      } else {
+        p  <- c(0.3, log(0.5), log(0.5), 0.15)
+        fp <- c(FALSE, identical(ref, "pos"), identical(ref, "neg"), FALSE)
+        args <- list(fixed_comp = comp, fixed_c = 0.45)
+      }
+      # The free tail's slot holds delta rather than a log-rate.
+      p[which(!fp)[sum(!fp) - 1]] <- -0.4
+      do.call(check_derivs,
+              c(list(p, fp, xu, su,
+                     info = paste("ratio", ref, "pinned", comp, "mu free"),
+                     ratio_ref = ref, ratio_k = k),
+                args))
+    }
+  }
+})
+
 test_that("Both constraints together give correct derivatives", {
   k <- 2
   p <- c(log(0.35 / 0.2), log(0.5), -0.6, 0.1)
@@ -694,6 +721,33 @@ test_that("A binding tail-heaviness constraint lands on the bound", {
   both <- ebnm_gen_point_laplace(x, s, scale = c(true_scale_pos, bound),
                                  optmethod = "nograd_lbfgsb")
   expect_equal(con[[g_ret_str()]]$scale_neg[3], bound, tolerance = 1e-4)
+  expect_equal(as.numeric(con[[llik_ret_str()]]),
+               as.numeric(both[[llik_ret_str()]]), tolerance = 1e-5)
+})
+
+test_that("The tail-heaviness bound holds with the negative tail as reference", {
+  # Mirror of the positive-reference test: fixing scale_neg makes scale_pos
+  #   the free tail, which may be at most k times as heavy.
+  for (k in c(0.5, 1, 2, 5)) {
+    r <- ebnm_gen_point_laplace(x, s, scale = c(NA, true_scale_neg),
+                                scale_ratio = k, optmethod = "nograd_lbfgsb")
+    g <- r[[g_ret_str()]]
+    expect_lte(g$scale_pos[2], k * g$scale_neg[3] * (1 + 1e-6))
+    expect_valid_genpl(g, info = paste("neg reference, k =", k))
+  }
+})
+
+test_that("A binding constraint with the negative tail as reference lands on the bound", {
+  # With scale_neg fixed at 4 the unconstrained scale_pos is about 10.4, so
+  #   k = 1 binds and the fit must sit at scale_pos = k * scale_neg, which is
+  #   the model with both scales fixed at those values.
+  k <- 1
+  bound <- k * true_scale_neg
+  con <- ebnm_gen_point_laplace(x, s, scale = c(NA, true_scale_neg),
+                                scale_ratio = k, optmethod = "nograd_lbfgsb")
+  both <- ebnm_gen_point_laplace(x, s, scale = c(bound, true_scale_neg),
+                                 optmethod = "nograd_lbfgsb")
+  expect_equal(con[[g_ret_str()]]$scale_pos[2], bound, tolerance = 1e-4)
   expect_equal(as.numeric(con[[llik_ret_str()]]),
                as.numeric(both[[llik_ret_str()]]), tolerance = 1e-5)
 })
